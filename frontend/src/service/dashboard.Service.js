@@ -1,4 +1,5 @@
-const API_BASE = '/api/dashboard';
+const API_URL = import.meta.env.VITE_BASE_URL;
+const API_BASE = import.meta.env.VITE_BASE_URL ? `${import.meta.env.VITE_BASE_URL}/api/dashboard` : '/api/dashboard';
 
 function buildSedeParam(sedeId) {
   // Backend expects no sedeId param (or null) for "all sedes"
@@ -243,5 +244,17 @@ export const dashboardService = {
       return null;
     }
   },
+};
+
+export const obtenerInventarioFlota = async (sedeId = null) => {
+    try {
+        const parametroSede = sedeId ? `?sedeId=${sedeId}` : '';
+        const respuesta = await fetch(`/api/dashboard/vehiculos${parametroSede}`);
+        if (!respuesta.ok) throw new Error('Error al conectar con el servidor');
+        return await respuesta.json();
+    } catch (error) {
+        console.error("Error en obtenerInventarioFlota:", error);
+        return [];
+    }
 };
 
