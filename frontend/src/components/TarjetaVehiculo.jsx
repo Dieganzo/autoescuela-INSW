@@ -1,8 +1,8 @@
 import React from 'react';
-import { AlertTriangle, Car } from 'lucide-react';
+import { AlertTriangle, Car, Calendar } from 'lucide-react';
 
 const TarjetaVehiculo = ({ vehiculo, alFinalizar }) => {
-  // Si el backend envio alertas, el auto "esta mal" y se pone rojo
+  // Si el backend envio alertas, el auto esta mal y se pone rojo
   const tieneAlertas = vehiculo.alertas && vehiculo.alertas.length > 0;
 
   return (
@@ -53,6 +53,20 @@ const TarjetaVehiculo = ({ vehiculo, alFinalizar }) => {
           </button>
         )}
       </div>
+
+    {/* Fecha de Vencimiento */}
+      {vehiculo.fecha_revision_tecnica && (
+        <div className="mt-4 pt-3 border-t border-gray-200/60 flex items-center justify-between">
+          <div className="flex items-center gap-2 text-gray-500">
+            <Calendar size={16} />
+            <span className="text-xs font-medium uppercase tracking-wide">Rev. Técnica</span>
+          </div>
+          <span className="text-sm font-bold text-gray-700">
+            {new Date(vehiculo.fecha_revision_tecnica).toLocaleDateString('es-CL')}
+          </span>
+        </div>
+      )}
+
     </div>
   );
 };
