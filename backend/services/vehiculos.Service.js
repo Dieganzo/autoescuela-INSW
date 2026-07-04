@@ -1,40 +1,72 @@
-const pool = require('../db/db');
+const { AppDataSource } = require('../db/data-source');
 // Importamos la logica centralizada para no repetir codigo
 const { obtenerAlertasVehiculo } = require('./dashboard.Service');
 
 //Obtiene la flota completa con las alertas preventivas calculadas
 const getFlotaService = async (sedeId) => {
-  let query = `
-    SELECT v.*, s.nombre as sede_nombre 
-    FROM vehiculos v 
-    JOIN sedes s ON v.sede_id = s.id
-  `;
-  
-  const params = [];
-  if (sedeId) {
-    query += ` WHERE v.sede_id = $1`;
-    params.push(sedeId);
-  }
-  
-  query += ` ORDER BY v.id ASC`;
-  
-  const result = await pool.query(query, params);
+  const vehiculoRepository = AppDataSource.getRepository('Vehiculo');
+  const sedeRepository = AppDataSource.getRepository('Sede');
 
-  // Mapeamos los resultados para inyectar las alertas automaticas
-  return result.rows.map(vehiculo => {
-    return {
-      ...vehiculo,
-      // Usamos la funcion de dashboard.Service para evaluar km y fechas
-      alertas: obtenerAlertasVehiculo(vehiculo)
-    };
-  });
+  try {
+    let query = vehiculoRepository.createQueryBuilder('v')
+      .leftJoinAndSelect('v.sede', 's');
+
+    if (sedeId) {
+      query.where('v.sede_id = :sedeId', { sedeId });
+    }
+
+    query.orderBy('v.id', 'ASC');
+    const vehiculos = await query.getMany();
+
+    // Mapeamos los resultados para inyectar las alertas automaticas
+    return vehiculos.map(vehiculo => {
+      return {
+        id: vehiculo.id,
+        patente: vehiculo.patente,
+        modelo: vehiculo.modelo,
+        estado: vehiculo.estado,
+        sede_id: vehiculo.sede_id,
+        sede_nombre: vehiculo.sede?.nombre,
+        kilometraje_actual: vehiculo.kilometraje_actual,
+        km_ultimo_aceite: vehiculo.km_ultimo_aceite,
+        km_ultimos_frenos: vehiculo.km_ultimos_frenos,
+        km_proximo_mantenimiento: vehiculo.km_proximo_mantenimiento,
+        fecha_revision_tecnica: vehiculo.fecha_revision_tecnica,
+        // Usamos la funcion de dashboard.Service para evaluar km y fechas
+        alertas: obtenerAlertasVehiculo(vehiculo)
+      };
+    });
+  } catch (error) {
+    throw error;
+  }
 };
 
 //Actualiza el estado del vehiculo (Disponible, Mantenimiento, En sesion)
 const updateEstadoService = async (id, estado) => {
-  const query = `UPDATE vehiculos SET estado = $1 WHERE id = $2 RETURNING *`;
-  const result = await pool.query(query, [estado, id]);
-  return result.rows[0];
+  const vehiculoRepository = AppDataSource.getRepository('Vehiculo');
+
+  try {
+    const vehiculo = await vehiculoRepository.findOne({ where: { id } });
+    
+    if (!vehiculo) {
+      const error = new Error('Vehículo no encontrado');
+      error.status = 404;
+      throw error;
+    }
+
+    vehiculo.estado = estado;
+    const resultado = await vehiculoRepository.save(vehiculo);
+    
+    return {
+      id: resultado.id,
+      patente: resultado.patente,
+      modelo: resultado.modelo,
+      estado: resultado.estado,
+      sede_id: resultado.sede_id
+    };
+  } catch (error) {
+    throw error;
+  }
 };
 
 module.exports = { 

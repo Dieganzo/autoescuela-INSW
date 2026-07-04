@@ -4,6 +4,7 @@ import TopBar from '../components/TopBar';
 import DashboardView from './DashboardView';
 import MetasView from './MetasView';
 import ReservasView from './ReservasView';
+import EstudiantesView from './EstudiantesView';
 import Proximamente from '../components/Proximamente';
 
 export default function MainLayout({ user, onLogout }) {
@@ -25,6 +26,8 @@ export default function MainLayout({ user, onLogout }) {
         return <DashboardView sedeActiva={sedeActiva} user={user} />;
       case 'metas':
         return <MetasView sedeActiva={sedeActiva} user={user} />;
+      case 'estudiantes':
+        return <EstudiantesView />;
       case 'agenda':
         return <ReservasView user={user} />;
       default:

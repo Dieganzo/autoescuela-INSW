@@ -132,7 +132,7 @@ async function buscarEstudiantes(sedeId, q) {
       query.andWhere('u.sede_id = :sedeId', { sedeId });
     }
 
-    // filtro por búsqueda (nombre, email, rut)
+    // filtro por busqueda (nombre, email, rut)
     if (q) {
       query.andWhere(
         '(u.nombre ILIKE :q OR u.email ILIKE :q OR u.rut ILIKE :q)',
@@ -156,6 +156,46 @@ async function buscarEstudiantes(sedeId, q) {
       horasTotales: parseFloat(parseFloat(row.horas_totales).toFixed(2)),
     }));
 
+  } catch (error) {
+    throw error;
+  }
+}
+
+// GET /api/estudiantes/list - obtener lista simple de estudiantes
+async function getListaEstudiantes() {
+  try {
+    const resultados = await AppDataSource.createQueryBuilder()
+      .select('u.id', 'id')
+      .addSelect('u.nombre', 'nombre')
+      .addSelect('u.email', 'email')
+      .addSelect('u.rut', 'rut')
+      .addSelect('u.sede_id', 'sede_id')
+      .addSelect('u.estado', 'estado')
+      .addSelect('s.nombre', 'sede_nombre')
+      .addSelect('COUNT(r.id)', 'total_clases')
+      .addSelect('COALESCE(SUM(EXTRACT(EPOCH FROM (r.fecha_fin - r.fecha_inicio)) / 3600), 0)', 'horas_totales')
+      .from('usuarios', 'u')
+      .leftJoin('sedes', 's', 'u.sede_id = s.id')
+      .leftJoin('reservas', 'r', "u.id = r.estudiante_id AND r.estado = 'completada'")
+      .where("u.rol = 'estudiante'")
+      .groupBy('u.id, s.id')
+      .orderBy('u.nombre', 'ASC')
+      .limit(100)
+      .getRawMany();
+
+    return resultados.map(row => ({
+      id: row.id,
+      nombre: row.nombre,
+      email: row.email,
+      rut: row.rut,
+      estado: row.estado,
+      sede: {
+        id: row.sede_id,
+        nombre: row.sede_nombre,
+      },
+      totalClases: parseInt(row.total_clases, 10),
+      horasTotales: parseFloat(parseFloat(row.horas_totales).toFixed(2)),
+    }));
   } catch (error) {
     throw error;
   }
@@ -497,6 +537,7 @@ async function actualizarProgresoModulo(estudianteId, moduloId, datosActualizar)
 module.exports = { 
   getPerfilEstudiante, 
   buscarEstudiantes, 
+  getListaEstudiantes,
   crearEstudiante, 
   getModulosEstudiante,
   getTimelineEstudiante,

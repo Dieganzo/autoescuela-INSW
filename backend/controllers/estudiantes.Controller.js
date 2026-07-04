@@ -83,7 +83,7 @@ const actualizarEstudiante = async (req, res) => {
   }
 };
 
-// GET /api/modulos - obtener todos los módulos teóricos
+// GET /api/modulos - obtener todos los modulos teoricos
 const getModulosTeoricos = async (req, res) => {
   try {
     const modulos = await estudiantesService.getModulosTeoricos();
@@ -94,7 +94,7 @@ const getModulosTeoricos = async (req, res) => {
   }
 };
 
-// POST /api/estudiantes/:id/modulos/:moduloId - asignar módulo a estudiante
+// POST /api/estudiantes/:id/modulos/:moduloId - asignar modulo a estudiante
 const asignarModuloEstudiante = async (req, res) => {
   try {
     const { id, moduloId } = req.params;
@@ -109,7 +109,18 @@ const asignarModuloEstudiante = async (req, res) => {
   }
 };
 
-// PUT /api/estudiantes/:id/modulos/:moduloId - actualizar progreso del módulo
+// GET /api/estudiantes/list - obtener lista simple de estudiantes
+const getListaEstudiantes = async (req, res) => {
+  try {
+    const resultados = await estudiantesService.getListaEstudiantes();
+    res.json(resultados);
+  } catch (error) {
+    console.error('Error en getListaEstudiantes:', error.message);
+    res.status(500).json({ error: 'Error al obtener la lista de estudiantes' });
+  }
+};
+
+// PUT /api/estudiantes/:id/modulos/:moduloId - actualizar progreso del modulo
 const actualizarProgresoModulo = async (req, res) => {
   try {
     const { id, moduloId } = req.params;
@@ -124,4 +135,4 @@ const actualizarProgresoModulo = async (req, res) => {
   }
 };
 
-module.exports = { crearEstudiante, getPerfilEstudiante, buscarEstudiantes, getModulosEstudiante, getTimelineEstudiante, actualizarEstudiante, getModulosTeoricos, asignarModuloEstudiante, actualizarProgresoModulo };
+module.exports = { crearEstudiante, getPerfilEstudiante, buscarEstudiantes, getListaEstudiantes, getModulosEstudiante, getTimelineEstudiante, actualizarEstudiante, getModulosTeoricos, asignarModuloEstudiante, actualizarProgresoModulo };
