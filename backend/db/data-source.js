@@ -3,7 +3,7 @@
 const { DataSource } = require('typeorm');
 require('dotenv').config();
 
-const entities = require('../entity');
+const entity = require('../entity');
 
 const AppDataSource = new DataSource({
   type: 'postgres',
@@ -12,13 +12,13 @@ const AppDataSource = new DataSource({
   username: process.env.DB_USER || 'postgres',
   password: process.env.DB_PASSWORD || '',
   database: process.env.DB_NAME || 'autoescuela',
-  synchronize: true,
+  synchronize: false,
   logging: false,
-  entities: Object.values(entities),
+  entities: Object.values(entity),
   // Zona horaria de Chile para que NOW() y los timestamps sean correctos
   extra: {
     options: "-c timezone=America/Santiago",
   },
 });
 
-module.exports = { AppDataSource, ...entities };
+module.exports = { AppDataSource, ...entity };

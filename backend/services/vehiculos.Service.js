@@ -1,4 +1,4 @@
-const pool = require('../db/db');
+const { AppDataSource } = require('../db/data-source');
 // Importamos la logica centralizada para no repetir codigo
 const { obtenerAlertasVehiculo } = require('./dashboard.Service');
 
@@ -18,10 +18,10 @@ const getFlotaService = async (sedeId) => {
   
   query += ` ORDER BY v.id ASC`;
   
-  const result = await pool.query(query, params);
+  const rows = await AppDataSource.query(query, params);
 
   // Mapeamos los resultados para inyectar las alertas automaticas
-  return result.rows.map(vehiculo => {
+  return rows.map(vehiculo => {
     return {
       ...vehiculo,
       // Usamos la funcion de dashboard.Service para evaluar km y fechas
@@ -33,8 +33,8 @@ const getFlotaService = async (sedeId) => {
 //Actualiza el estado del vehiculo (Disponible, Mantenimiento, En sesion)
 const updateEstadoService = async (id, estado) => {
   const query = `UPDATE vehiculos SET estado = $1 WHERE id = $2 RETURNING *`;
-  const result = await pool.query(query, [estado, id]);
-  return result.rows[0];
+  const rows = await AppDataSource.query(query, [estado, id]);
+  return rows[0];
 };
 
 module.exports = { 
