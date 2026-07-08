@@ -109,10 +109,7 @@ async function getVehiculos(sedeId) {
   
   const rows = await qb.getRawMany();
   //Mapeamos los resultados para inyectar las alertas 
-  return rows.map(auto => ({
-    ...auto,
-    alertas: obtenerAlertasVehiculo(auto)
-  }));
+  return Promise.all(rows.map(auto => sincronizarEstadoMantenimiento(auto)));
 }
 
 // Grafico semanal — con dias fantasma
@@ -480,34 +477,64 @@ async function eliminarMeta(id) {
     }
 
     //alerta Revision tecnica
-    if (vehiculo.fecha_revision_tecnica) {
-        const fechaActual = new Date();
-        const fechaRevision = new Date(vehiculo.fecha_revision_tecnica);
-        const diferenciaDias = (fechaRevision - fechaActual) / (1000 * 60 * 60 * 24);
+  if (vehiculo.fecha_revision_tecnica) {
+    const fechaActual = new Date();
+    const fechaRevision = new Date(vehiculo.fecha_revision_tecnica);
+    const diferenciaDias = (fechaRevision - fechaActual) / (1000 * 60 * 60 * 24);
 
-        if (diferenciaDias <= 30) {
-            alertas.push({ 
-                item: "Revision Tecnica", 
-                nivel: "Urgente", 
-                mensaje: `Vence en ${Math.round(diferenciaDias)} dias` 
-            });
-        }
-    }
+     if (diferenciaDias < 0) {
+        // si el numero es negativo, significa que ya vencio
+        alertas.push({ 
+            item: "Revision Tecnica", 
+            nivel: "Critico", // cambiado a Critico porque ya esta vencida
+            mensaje: `Vencida hace ${Math.abs(Math.round(diferenciaDias))} días` 
+        });
+      } else if (diferenciaDias <= 30) {
+        // Si le quedan 30 días o menos por vencer
+        alertas.push({ 
+            item: "Revision Tecnica", 
+            nivel: "Urgente", 
+            mensaje: `Vence en ${Math.round(diferenciaDias)} dias` 
+         });
+     }
+  }
 
     return alertas;
 };
 
+const sincronizarEstadoMantenimiento = async (vehiculo) => {
+  const alertas = obtenerAlertasVehiculo(vehiculo);
+  const requiereMantenimiento = alertas.some(alerta => alerta.nivel === 'Critico');
+
+  if (!requiereMantenimiento) {
+    return { ...vehiculo, alertas };
+  }
+
+  if (vehiculo.estado !== 'mantenimiento') {
+    await AppDataSource.getRepository('Vehiculo').update(
+      { id: parseInt(vehiculo.id, 10) },
+      { estado: 'mantenimiento' }
+    );
+  }
+
+  return {
+    ...vehiculo,
+    estado: 'mantenimiento',
+    alertas
+  };
+};
+
 const finalizarSesionVehiculo = async (id, kmRecorridos) => { 
     const repo = AppDataSource.getRepository('Vehiculo');
-    // Lógica para actualizar los kilómetros y liberar el vehículo
+    // Logica para actualizar los kilometros y liberar el vehiculo
   try {
     const vehiculoRepository = AppDataSource.getRepository("Vehiculo");
     const vehiculo = await vehiculoRepository.findOneBy({ id: parseInt(id) });
     
     if (vehiculo) {
-      // Sumamos los kilómetros recorridos al total actual
+      // sumamos los kilometros recorridos al total actual
       vehiculo.kilometraje_actual += parseInt(kmRecorridos);
-      // Cambiamos el estado para que otros puedan usarlo
+      // cambiamos el estado para que otros puedan usarlo
       vehiculo.estado = 'disponible';
       
       return await vehiculoRepository.save(vehiculo);
@@ -524,5 +551,6 @@ module.exports = {
   getKPIs, getClasesHoy, getClasesProximas, getVehiculos,
   getGraficoSemana, getUsoFlota, generarReporteAvanzado,
   getAprobadosReprobados, getOcupacionSede, getIngresos, getRendimientoMes,
-  crearMeta, obtenerMetas, actualizarMeta, eliminarMeta,obtenerAlertasVehiculo, finalizarSesionVehiculo,
+  crearMeta, obtenerMetas, actualizarMeta, eliminarMeta,obtenerAlertasVehiculo,
+  sincronizarEstadoMantenimiento, finalizarSesionVehiculo,
 };

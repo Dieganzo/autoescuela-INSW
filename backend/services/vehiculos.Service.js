@@ -1,6 +1,6 @@
 const { AppDataSource } = require('../db/data-source');
 // Importamos la logica centralizada para no repetir codigo
-const { obtenerAlertasVehiculo } = require('./dashboard.Service');
+const { sincronizarEstadoMantenimiento } = require('./dashboard.Service');
 
 //Obtiene la flota completa con las alertas preventivas calculadas
 const getFlotaService = async (sedeId) => {
@@ -21,13 +21,7 @@ const getFlotaService = async (sedeId) => {
   const rows = await AppDataSource.query(query, params);
 
   // Mapeamos los resultados para inyectar las alertas automaticas
-  return rows.map(vehiculo => {
-    return {
-      ...vehiculo,
-      // Usamos la funcion de dashboard.Service para evaluar km y fechas
-      alertas: obtenerAlertasVehiculo(vehiculo)
-    };
-  });
+  return Promise.all(rows.map(vehiculo => sincronizarEstadoMantenimiento(vehiculo)));
 };
 
 //Actualiza el estado del vehiculo (Disponible, Mantenimiento, En sesion)
