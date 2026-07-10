@@ -1,5 +1,7 @@
 const vehiculoService = require('../services/vehiculos.Service');
-const { AppDataSource } = require('../db/data-source'); // Importamos la DB
+
+const usuarioAuditoria = (req) => req.headers['x-usuario'] || req.headers['x-user'] || null;
+const motivoAuditoria = (req) => req.body?.motivo || null;
 
 const getFlota = async (req, res) => {
   try {
@@ -10,9 +12,41 @@ const getFlota = async (req, res) => {
   }
 };
 
+// Controlador para crear un nuevo vehiculo
+const crearVehiculo = async (req, res) => {
+  try {
+    const vehiculo = await vehiculoService.crearVehiculoService(req.body, usuarioAuditoria(req), motivoAuditoria(req));
+    res.status(201).json({ mensaje: 'Vehiculo creado', vehiculo });
+  } catch (error) {
+    res.status(500).json({ error: 'Error al crear vehiculo' });
+  }
+};
+
+// Controlador para actualizar un vehiculo existente
+const updateVehiculo = async (req, res) => {
+  try {
+    const vehiculo = await vehiculoService.updateVehiculoService(
+      req.params.id,
+      req.body,
+      usuarioAuditoria(req),
+      motivoAuditoria(req)
+    );
+    if (!vehiculo) return res.status(404).json({ error: 'No encontrado' });
+    res.json({ mensaje: 'Actualizado', vehiculo });
+  } catch (error) {
+    res.status(500).json({ error: 'Error al actualizar vehiculo' });
+  }
+};
+
+// Controlador para actualizar el estado de un vehiculo
 const updateEstadoVehiculo = async (req, res) => {
   try {
-    const vehiculo = await vehiculoService.updateEstadoService(req.params.id, req.body.estado);
+    const vehiculo = await vehiculoService.updateEstadoService(
+      req.params.id,
+      req.body.estado,
+      usuarioAuditoria(req),
+      motivoAuditoria(req)
+    );
     if (!vehiculo) return res.status(404).json({ error: 'No encontrado' });
     res.json({ mensaje: 'Actualizado', vehiculo });
   } catch (error) {
@@ -20,26 +54,47 @@ const updateEstadoVehiculo = async (req, res) => {
   }
 };
 
-// NUEVA FUNCIÓN: Actualiza los KM y libera el auto en tiempo real
+// Controlador para registrar el fin de sesión de un vehiculo
 const registrarFinDeSesion = async (req, res) => {
-    try {
-        const { id } = req.params;
-        const { kmRecorridos } = req.body;
-        
-        const repo = AppDataSource.getRepository('Vehiculo');
-        const auto = await repo.findOneBy({ id: parseInt(id) });
+  try {
+    const { id } = req.params;
+    const { kmRecorridos } = req.body;
+    const auto = await vehiculoService.finalizarSesionService(id, kmRecorridos, usuarioAuditoria(req));
 
-        if (auto) {
-            auto.kilometraje_actual = (auto.kilometraje_actual || 0) + (kmRecorridos || 0);
-            auto.estado = "disponible";
-            await repo.save(auto);
-            return res.json({ mensaje: "Kilometraje actualizado", auto });
-        }
-        res.status(404).json({ error: "Vehículo no encontrado" });
-    } catch (error) {
-        res.status(500).json({ error: error.message });
-    }
+    if (auto) return res.json({ mensaje: 'Kilometraje actualizado', auto });
+    return res.status(404).json({ error: 'Vehiculo no encontrado' });
+  } catch (error) {
+    return res.status(500).json({ error: error.message });
+  }
 };
 
-// Exportamos todo correctamente sin usar "export const"
-module.exports = { getFlota, updateEstadoVehiculo, registrarFinDeSesion };
+// Controlador para eliminar un vehiculo
+const eliminarVehiculo = async (req, res) => {
+  try {
+    const vehiculo = await vehiculoService.eliminarVehiculoService(req.params.id, usuarioAuditoria(req), motivoAuditoria(req));
+    if (!vehiculo) return res.status(404).json({ error: 'No encontrado' });
+    return res.json({ mensaje: 'Vehiculo eliminado', vehiculo });
+  } catch (error) {
+    return res.status(500).json({ error: 'Error al eliminar vehiculo' });
+  }
+};
+
+// Controlador para obtener el historial de un vehiculo
+const getHistorial = async (req, res) => {
+  try {
+    const historial = await vehiculoService.getHistorialService(req.params.id);
+    res.json(historial);
+  } catch (error) {
+    res.status(500).json({ error: 'Error al obtener historial' });
+  }
+};
+
+module.exports = {
+  getFlota,
+  crearVehiculo,
+  updateVehiculo,
+  updateEstadoVehiculo,
+  registrarFinDeSesion,
+  eliminarVehiculo,
+  getHistorial,
+};
