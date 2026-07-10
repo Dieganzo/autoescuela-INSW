@@ -83,6 +83,20 @@ const actualizarEstudiante = async (req, res) => {
   }
 };
 
+// DELETE /api/estudiantes/:id - eliminar estudiante
+const eliminarEstudiante = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const estudianteId = parseInt(id, 10);
+    const eliminado = await estudiantesService.eliminarEstudiante(estudianteId);
+    res.json(eliminado);
+  } catch (error) {
+    console.error('Error en eliminarEstudiante:', error.message);
+    const statusCode = error.status || 500;
+    res.status(statusCode).json({ error: error.message || 'Error al eliminar el estudiante' });
+  }
+};
+
 // GET /api/modulos - obtener todos los modulos teoricos
 const getModulosTeoricos = async (req, res) => {
   try {
@@ -135,4 +149,4 @@ const actualizarProgresoModulo = async (req, res) => {
   }
 };
 
-module.exports = { crearEstudiante, getPerfilEstudiante, buscarEstudiantes, getListaEstudiantes, getModulosEstudiante, getTimelineEstudiante, actualizarEstudiante, getModulosTeoricos, asignarModuloEstudiante, actualizarProgresoModulo };
+module.exports = { crearEstudiante, getPerfilEstudiante, buscarEstudiantes, getListaEstudiantes, getModulosEstudiante, getTimelineEstudiante, actualizarEstudiante, eliminarEstudiante, getModulosTeoricos, asignarModuloEstudiante, actualizarProgresoModulo };

@@ -18,6 +18,12 @@ const validarSedeId = (req, res, next) => {
   next();
 };
 
+const formatearRut = (rut) => {
+  const limpio = String(rut || '').toUpperCase().replace(/[^0-9K]/g, '');
+  if (limpio.length <= 1) return limpio;
+  return `${limpio.slice(0, -1)}-${limpio.slice(-1)}`;
+};
+
 // middleware que valida el body para crear estudiante
 const validarCrearEstudiante = (req, res, next) => {
   const { nombre, email, telefono, rut, sedeId } = req.body;
@@ -44,11 +50,19 @@ const validarCrearEstudiante = (req, res, next) => {
     });
   }
 
-  // validar rut
-  const rutRegex = /^[0-9]{7,8}(-?[0-9K])?$/i;
-  if (!rutRegex.test(rut)) {
+  // validar rut: solo numeros 0-9 y K, con guion antes del verificador
+  const rutOriginal = String(rut || '').toUpperCase().trim();
+  if (/[^0-9K-]/.test(rutOriginal)) {
     return res.status(400).json({
-      error: 'El RUT debe tener formato válido (ej: 12345678-9 o 12345678)'
+      error: 'El RUT solo puede contener numeros del 0 al 9, K y el guion automatico'
+    });
+  }
+
+  const rutFormateado = formatearRut(rut);
+  const rutRegex = /^[0-9]{7,8}-[0-9K]$/i;
+  if (!rutRegex.test(rutFormateado)) {
+    return res.status(400).json({
+      error: 'El RUT debe tener formato valido (ej: 12345678-9) y usar solo 0-9 o K'
     });
   }
 
@@ -68,7 +82,7 @@ const validarCrearEstudiante = (req, res, next) => {
   }
 
   req.body.email = email.toLowerCase().trim();
-  req.body.rut = rut.toUpperCase().trim();
+  req.body.rut = rutFormateado;
   req.body.nombre = nombre.trim();
   req.body.sedeId = parsedSedeId;
 

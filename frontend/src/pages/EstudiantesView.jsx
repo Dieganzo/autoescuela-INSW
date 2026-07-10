@@ -2,7 +2,29 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { estudiantesService } from '../service/estudiantes.Service';
 import { getSedes } from '../service/reservas.Service';
 
-function PerfilCard({ perfil, editando, editForm, setEditForm, onEdit, onCancel, onSave }) {
+const formatearRut = (valor) => {
+  const limpio = valor.toUpperCase().replace(/[^0-9K]/g, '').slice(0, 9);
+  if (limpio.length <= 1) return limpio;
+  return `${limpio.slice(0, -1)}-${limpio.slice(-1)}`;
+};
+
+const getNombreSede = (sede) => {
+  if (!sede) return 'Sede';
+  if (sede.nombre) return sede.nombre;
+  if (String(sede.id) === '1') return 'Sede Central';
+  if (String(sede.id) === '2') return 'Sede Norte';
+  return sede.direccion || `Sede ${sede.id}`;
+};
+
+const getNombreSedeEstudiante = (est) => {
+  if (est?.sede?.nombre) return est.sede.nombre;
+  if (est?.sede_nombre) return est.sede_nombre;
+  if (String(est?.sede_id) === '1') return 'Sede Central';
+  if (String(est?.sede_id) === '2') return 'Sede Norte';
+  return 'Sin sede';
+};
+
+function PerfilCard({ perfil, editando, editForm, setEditForm, onEdit, onCancel, onSave, onDelete }) {
   if (!perfil) return null;
 
   const horas = perfil.horasPracticas || {};
@@ -52,9 +74,14 @@ function PerfilCard({ perfil, editando, editForm, setEditForm, onEdit, onCancel,
             </button>
           </div>
         ) : (
-          <button onClick={onEdit} className="px-4 py-2 bg-blue-500 text-white rounded-lg text-sm font-medium">
-            Editar
-          </button>
+          <div className="flex gap-2">
+            <button onClick={onEdit} className="px-4 py-2 bg-blue-500 text-white rounded-lg text-sm font-medium">
+              Editar
+            </button>
+            <button onClick={onDelete} className="px-4 py-2 bg-red-500 text-white rounded-lg text-sm font-medium">
+              Eliminar
+            </button>
+          </div>
         )}
       </div>
 
@@ -190,7 +217,37 @@ function ModulosCard({ modulos, modulosDisponibles, moduloSeleccionado, setModul
 }
 
 function TimelineCard({ timeline }) {
-  if (!timeline || timeline.length === 0) {
+  const pasadas = Array.isArray(timeline)
+    ? timeline
+    : timeline?.pasadas || [];
+  const futuras = Array.isArray(timeline)
+    ? []
+    : timeline?.futuras || [];
+  const total = Array.isArray(timeline)
+    ? timeline.length
+    : timeline?.total || pasadas.length + futuras.length;
+
+  const renderClase = (clase) => {
+    const fecha = clase.fecha || clase.fecha_inicio;
+    const instructor = clase.instructor || clase.instructor_nombre || 'Sin instructor';
+    const vehiculo = clase.vehiculo || clase.vehiculo_patente || clase.vehiculo_modelo || 'N/A';
+    return (
+      <div key={clase.id} className="flex gap-4 p-3 border border-gray-200 rounded-lg">
+        <div className="flex-1">
+          <p className="font-semibold text-gray-800">{instructor}</p>
+          <p className="text-sm text-gray-600">{vehiculo}</p>
+          <p className="text-xs text-gray-500 mt-1">
+            {fecha ? new Date(fecha).toLocaleString('es-CL') : 'Sin fecha'}
+          </p>
+        </div>
+        <span className="h-fit px-2 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-700">
+          {clase.estado}
+        </span>
+      </div>
+    );
+  };
+
+  if (!timeline || total === 0) {
     return (
       <div className="bg-white rounded-xl border border-gray-200 p-6 text-center text-gray-500">
         No hay clases registradas
@@ -201,26 +258,19 @@ function TimelineCard({ timeline }) {
   return (
     <div className="bg-white rounded-xl border border-gray-200 p-6">
       <h3 className="text-lg font-bold text-gray-800 mb-4">Historial de Clases</h3>
-      <div className="space-y-3 max-h-96 overflow-y-auto">
-        {timeline.map((clase) => {
-          const fecha = clase.fecha || clase.fecha_inicio;
-          const instructor = clase.instructor || clase.instructor_nombre || 'Sin instructor';
-          const vehiculo = clase.vehiculo || clase.vehiculo_patente || clase.vehiculo_modelo || 'N/A';
-          return (
-            <div key={clase.id} className="flex gap-4 p-3 border border-gray-200 rounded-lg">
-              <div className="flex-1">
-                <p className="font-semibold text-gray-800">{instructor}</p>
-                <p className="text-sm text-gray-600">{vehiculo}</p>
-                <p className="text-xs text-gray-500 mt-1">
-                  {fecha ? new Date(fecha).toLocaleString('es-CL') : 'Sin fecha'}
-                </p>
-              </div>
-              <span className="h-fit px-2 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-700">
-                {clase.estado}
-              </span>
-            </div>
-          );
-        })}
+      <div className="space-y-5 max-h-96 overflow-y-auto">
+        {futuras.length > 0 && (
+          <div>
+            <h4 className="text-sm font-semibold text-gray-700 mb-2">Proximas clases</h4>
+            <div className="space-y-3">{futuras.map(renderClase)}</div>
+          </div>
+        )}
+        {pasadas.length > 0 && (
+          <div>
+            <h4 className="text-sm font-semibold text-gray-700 mb-2">Clases pasadas</h4>
+            <div className="space-y-3">{pasadas.map(renderClase)}</div>
+          </div>
+        )}
       </div>
     </div>
   );
@@ -288,7 +338,7 @@ export default function EstudiantesView() {
         telefono: perfilData.telefono || '',
       });
       setModulos(modulosData?.modulos || []);
-      setTimeline(Array.isArray(timelineData) ? timelineData : []);
+      setTimeline(timelineData || { pasadas: [], futuras: [], total: 0 });
       setModulosDisponibles(disponiblesData?.modulos || []);
       setModuloSeleccionado('');
       setTab('perfil');
@@ -365,6 +415,29 @@ export default function EstudiantesView() {
     }
   };
 
+  const eliminarEstudiante = async (estudiante) => {
+    if (!estudiante) return;
+    const confirmar = window.confirm(`¿Eliminar al estudiante ${estudiante.nombre}?`);
+    if (!confirmar) return;
+
+    setLoading(true);
+    setError(null);
+    try {
+      await estudiantesService.eliminarEstudiante(estudiante.id);
+      if (perfil?.id === estudiante.id) {
+        setPerfil(null);
+        setModulos([]);
+        setTimeline([]);
+        setTab('lista');
+      }
+      await cargarEstudiantes();
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   return (
     <div className="p-8 font-body bg-neutral min-h-[calc(100vh-64px)] overflow-y-auto">
       <div className="flex justify-between items-center mb-6">
@@ -405,7 +478,7 @@ export default function EstudiantesView() {
               className="px-3 py-2 border border-gray-300 rounded-lg bg-white"
             >
               <option value="">Todas las sedes</option>
-              {sedes.map((sede) => <option key={sede.id} value={sede.id}>{sede.nombre}</option>)}
+              {sedes.map((sede) => <option key={sede.id} value={sede.id}>{getNombreSede(sede)}</option>)}
             </select>
             <button onClick={cargarEstudiantes} className="px-4 py-2 bg-blue-500 text-white rounded-lg font-medium">
               Buscar
@@ -419,20 +492,31 @@ export default function EstudiantesView() {
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
               {estudiantes.map((est) => (
-                <button
+                <div
                   key={est.id}
-                  className="text-left bg-white rounded-lg border border-gray-200 p-4 hover:shadow-md transition"
+                  className="text-left bg-white rounded-lg border border-gray-200 p-4 hover:shadow-md transition cursor-pointer"
                   onClick={() => cargarPerfil(est.id)}
                 >
-                  <h3 className="font-semibold text-gray-800">{est.nombre}</h3>
+                  <div className="flex justify-between items-start gap-3">
+                    <h3 className="font-semibold text-gray-800">{est.nombre}</h3>
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        eliminarEstudiante(est);
+                      }}
+                      className="px-2 py-1 bg-red-100 text-red-700 rounded text-xs font-medium hover:bg-red-200"
+                    >
+                      Eliminar
+                    </button>
+                  </div>
                   <p className="text-sm text-gray-500 mt-1">{est.email}</p>
                   <p className="text-xs text-gray-400 mt-2">RUT: {est.rut}</p>
                   <div className="mt-3 text-xs text-gray-600">
-                    <p>Sede: {est.sede?.nombre || 'Sin sede'}</p>
+                    <p>Sede: {getNombreSedeEstudiante(est)}</p>
                     <p>Clases: {est.totalClases || 0}</p>
                     <p>Horas: {(est.horasTotales || 0).toFixed(1)}h</p>
                   </div>
-                </button>
+                </div>
               ))}
             </div>
           )}
@@ -445,7 +529,13 @@ export default function EstudiantesView() {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <input required value={formData.nombre} onChange={(e) => setFormData({ ...formData, nombre: e.target.value })} className="px-3 py-2 border border-gray-300 rounded-lg" placeholder="Nombre" />
               <input required type="email" value={formData.email} onChange={(e) => setFormData({ ...formData, email: e.target.value })} className="px-3 py-2 border border-gray-300 rounded-lg" placeholder="Email" />
-              <input required value={formData.rut} onChange={(e) => setFormData({ ...formData, rut: e.target.value })} className="px-3 py-2 border border-gray-300 rounded-lg" placeholder="RUT" />
+              <input
+                required
+                value={formData.rut}
+                onChange={(e) => setFormData({ ...formData, rut: formatearRut(e.target.value) })}
+                className="px-3 py-2 border border-gray-300 rounded-lg"
+                placeholder="12345678-9"
+              />
               <input value={formData.telefono} onChange={(e) => setFormData({ ...formData, telefono: e.target.value })} className="px-3 py-2 border border-gray-300 rounded-lg" placeholder="Telefono" />
             </div>
             <select
@@ -453,7 +543,7 @@ export default function EstudiantesView() {
               onChange={(e) => setFormData({ ...formData, sedeId: Number(e.target.value) })}
               className="w-full px-3 py-2 border border-gray-300 rounded-lg"
             >
-              {sedes.map((sede) => <option key={sede.id} value={sede.id}>{sede.nombre}</option>)}
+              {sedes.map((sede) => <option key={sede.id} value={sede.id}>{getNombreSede(sede)}</option>)}
             </select>
             <button type="submit" disabled={loading} className="w-full px-4 py-2 bg-green-500 text-white rounded-lg font-medium disabled:opacity-50">
               {loading ? 'Creando...' : 'Crear Estudiante'}
@@ -472,6 +562,7 @@ export default function EstudiantesView() {
             onEdit={() => setEditando(true)}
             onCancel={() => setEditando(false)}
             onSave={guardarPerfil}
+            onDelete={() => eliminarEstudiante(perfil)}
           />
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             <ModulosCard

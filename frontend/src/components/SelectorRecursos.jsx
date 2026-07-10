@@ -9,6 +9,14 @@ export default function SelectorRecursos({ selecciones, onSelect, requiereVehicu
   const [vehiculos, setVehiculos] = useState([]);
   const [cargando, setCargando] = useState(true);
 
+  const getNombreSede = (sede) => {
+    if (!sede) return 'Sede';
+    if (sede.nombre) return sede.nombre;
+    if (String(sede.id) === '1') return 'Sede Central';
+    if (String(sede.id) === '2') return 'Sede Norte';
+    return sede.direccion || `Sede ${sede.id}`;
+  };
+
   // Cargar sedes al montar
   useEffect(() => {
     if (user && user.rol === 'estudiante') {
@@ -71,7 +79,7 @@ export default function SelectorRecursos({ selecciones, onSelect, requiereVehicu
             <label>Sede</label>
             <select name="sedeId" value={selecciones.sedeId || ''} onChange={handleChange}>
               <option value="">Seleccione Sede...</option>
-              {sedes.map(s => <option key={s.id} value={s.id}>{s.nombre}</option>)}
+              {sedes.map(s => <option key={s.id} value={s.id}>{getNombreSede(s)}</option>)}
             </select>
           </div>
 

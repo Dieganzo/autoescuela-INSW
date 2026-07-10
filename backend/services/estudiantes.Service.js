@@ -123,6 +123,7 @@ async function buscarEstudiantes(sedeId, q) {
       .leftJoin('sedes', 's', 'u.sede_id = s.id')
       .leftJoin('reservas', 'r', "u.id = r.estudiante_id AND r.estado = 'completada'")
       .where("u.rol = 'estudiante'")
+      .andWhere("u.estado = 'activo'")
       .groupBy('u.id, s.id')
       .orderBy('u.nombre', 'ASC')
       .limit(50);
@@ -178,6 +179,7 @@ async function getListaEstudiantes() {
       .leftJoin('sedes', 's', 'u.sede_id = s.id')
       .leftJoin('reservas', 'r', "u.id = r.estudiante_id AND r.estado = 'completada'")
       .where("u.rol = 'estudiante'")
+      .andWhere("u.estado = 'activo'")
       .groupBy('u.id, s.id')
       .orderBy('u.nombre', 'ASC')
       .limit(100)
@@ -320,8 +322,8 @@ async function getTimelineEstudiante(estudianteId) {
       .orderBy('r.fecha_inicio', 'DESC');
 
     const clases = await clasesQuery.getRawMany();
-
-    return clases.map(clase => ({
+    const ahora = new Date();
+    const timeline = clases.map(clase => ({
       id: clase.id,
       tipo: clase.tipo,
       fecha: clase.fecha_inicio,
@@ -330,6 +332,21 @@ async function getTimelineEstudiante(estudianteId) {
       instructor: clase.instructor_nombre,
       vehiculo: clase.vehiculo_patente,
     }));
+
+    const pasadas = timeline
+      .filter(clase => new Date(clase.fecha_fin || clase.fecha) < ahora)
+      .sort((a, b) => new Date(b.fecha) - new Date(a.fecha));
+
+    const futuras = timeline
+      .filter(clase => new Date(clase.fecha_fin || clase.fecha) >= ahora)
+      .sort((a, b) => new Date(a.fecha) - new Date(b.fecha));
+
+    return {
+      total: timeline.length,
+      pasadas,
+      futuras,
+      todas: [...futuras, ...pasadas],
+    };
 
   } catch (error) {
     throw error;
@@ -383,6 +400,35 @@ async function actualizarEstudiante(estudianteId, datosActualizar) {
       mensaje: 'Estudiante actualizado exitosamente',
     };
 
+  } catch (error) {
+    throw error;
+  }
+}
+
+// DELETE /api/estudiantes/:id - baja logica del estudiante
+async function eliminarEstudiante(estudianteId) {
+  const usuarioRepository = AppDataSource.getRepository('Usuario');
+
+  try {
+    const estudiante = await usuarioRepository.findOne({
+      where: { id: estudianteId, rol: 'estudiante' },
+    });
+
+    if (!estudiante) {
+      const error = new Error('Estudiante no encontrado');
+      error.status = 404;
+      throw error;
+    }
+
+    estudiante.estado = 'inactivo';
+    const resultado = await usuarioRepository.save(estudiante);
+
+    return {
+      id: resultado.id,
+      nombre: resultado.nombre,
+      estado: resultado.estado,
+      mensaje: 'Estudiante eliminado exitosamente',
+    };
   } catch (error) {
     throw error;
   }
@@ -542,6 +588,7 @@ module.exports = {
   getModulosEstudiante,
   getTimelineEstudiante,
   actualizarEstudiante,
+  eliminarEstudiante,
   getModulosTeoricos,
   asignarModuloEstudiante,
   actualizarProgresoModulo

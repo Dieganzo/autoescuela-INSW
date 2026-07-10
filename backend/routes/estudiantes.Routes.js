@@ -34,6 +34,9 @@ router.get('/:id/timeline', validarEstudianteId, ctrl.getTimelineEstudiante);
 // PUT /api/estudiantes/:id - actualizar datos del estudiante
 router.put('/:id', validarEstudianteId, validarActualizarEstudiante, ctrl.actualizarEstudiante);
 
+// DELETE /api/estudiantes/:id - eliminar estudiante
+router.delete('/:id', validarEstudianteId, ctrl.eliminarEstudiante);
+
 // GET /api/estudiantes/:id - perfil estudiante (DEBE IR AL FINAL para no interferar con rutas específicas)
 router.get('/:id', validarEstudianteId, ctrl.getPerfilEstudiante);
 

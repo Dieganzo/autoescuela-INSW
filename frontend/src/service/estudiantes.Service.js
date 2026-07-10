@@ -165,4 +165,21 @@ export const estudiantesService = {
       throw error;
     }
   },
+
+  // Eliminar estudiante
+  async eliminarEstudiante(estudianteId) {
+    try {
+      const res = await fetch(`${BASE_URL}/${estudianteId}`, {
+        method: 'DELETE',
+      });
+      if (!res.ok) {
+        const error = await res.json();
+        throw new Error(error.error || 'Error al eliminar estudiante');
+      }
+      return await res.json();
+    } catch (error) {
+      console.error('Error en eliminarEstudiante:', error);
+      throw error;
+    }
+  },
 };

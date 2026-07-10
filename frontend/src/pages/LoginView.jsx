@@ -10,6 +10,14 @@ export default function LoginView({ onLogin }) {
   const [sedeId, setSedeId] = useState('');
   const [estudianteId, setEstudianteId] = useState('');
 
+  const getNombreSede = (sede) => {
+    if (!sede) return 'Sede';
+    if (sede.nombre) return sede.nombre;
+    if (String(sede.id) === '1') return 'Sede Central';
+    if (String(sede.id) === '2') return 'Sede Norte';
+    return sede.direccion || `Sede ${sede.id}`;
+  };
+
   // 1. cargar sedes al montar
   useEffect(() => {
     const fetchSedes = async () => {
@@ -95,7 +103,7 @@ export default function LoginView({ onLogin }) {
                 >
                   <option value="">-- Elige una sede --</option>
                   {sedes.map(s => (
-                    <option key={s.id} value={s.id}>{s.nombre}</option>
+                    <option key={s.id} value={s.id}>{getNombreSede(s)}</option>
                   ))}
                 </select>
 
