@@ -3,6 +3,7 @@ import { dashboardService, obtenerInventarioFlota } from '../../service/dashboar
 import TarjetaVehiculo from '../../components/TarjetaVehiculo.jsx';
 import ModalFinalizarSesion from '../../components/ModalFinalizarSesion';
 import { Users, Car, AlertCircle } from 'lucide-react';
+import { useSocket } from '../../hooks/useSocket.js';
 
 export default function ResumenTab({ sedeActiva }) {
   const [kpis, setKpis] = useState({ estudiantesActivos: 0, clasesCompletadas: 0, vehiculosDisponibles: '0/0' });
@@ -11,6 +12,29 @@ export default function ResumenTab({ sedeActiva }) {
   const [modalAbierto, setModalAbierto] = useState(false);
   const [autoSeleccionado, setAutoSeleccionado] = useState(null);
 
+  const socket = useSocket(sedeActiva);
+
+  useEffect(() => {
+    if (!socket || typeof socket.on !== 'function') {
+      console.warn("Socket no disponible, omitiendo suscripcion a eventos.");
+      return;
+    }
+
+    const manejarVehiculoActualizado = (vehiculoActualizado) => {
+      console.log("Vehiculo actualizado recibido por Socket:", vehiculoActualizado);
+      setVehiculos((prev) =>
+        prev.map((v) => (v.id === vehiculoActualizado.id ? vehiculoActualizado : v))
+      );
+    };
+
+    // Escucha cuando se libera un auto o cambia de estado
+    socket.on('vehiculo:actualizado', manejarVehiculoActualizado);
+
+    return () => {
+      socket.off('vehiculo:actualizado', manejarVehiculoActualizado);
+    };
+  }, [socket]);
+
   const cargarDatos = useCallback(async () => {
     try {
       setLoading(true);
@@ -18,47 +42,14 @@ export default function ResumenTab({ sedeActiva }) {
         dashboardService.getDashboardKPIs(sedeActiva),
         obtenerInventarioFlota()
       ]);
-      
+
       setKpis(k || { estudiantesActivos: 0, clasesCompletadas: 0, vehiculosDisponibles: '0/0' });
 
-      // ---Esto imprimira los datos en la consola del navegador ---
-      console.log("Vehículos recibidos del backend:", v);
+      // Filtrar vehiculos por sede activa 
+      const vehiculosProcesados = v || [];
 
-      const hoy = new Date();
-      hoy.setHours(0, 0, 0, 0); // Normalizamos a medianoche para comparar solo fechas
-
-      const vehiculosProcesados = (v || []).map(auto => {
-        const nuevasAlertas = [];
-        
-        // 1. Buscamos el kilometraje actual 
-        const kmActual = Number(auto.kilometraje_actual || auto.kilometrajeActual || 0);
-        // 2. Buscamos el kilometraje para el próximo mantenimiento
-        const kmMantenimiento = Number(auto.km_proximo_mantenimiento || auto.kmProximoMantenimiento || 10000);
-
-        console.log(`🚗 Auto: ${auto.patente} | Actual: ${kmActual} | Límite usado: ${kmMantenimiento}`);
-
-        // Alerta de Kilometraje 
-        if (kmActual >= kmMantenimiento) {
-              nuevasAlertas.push({ mensaje: "Mantenimiento Necesario" });
-            }
-
-        // 2. Logica de fecha de revision tecnica
-        if (auto.fecha_revision_tecnica) {
-          const fechaRevision = new Date(auto.fecha_revision_tecnica);
-          if (fechaRevision < hoy) {
-            nuevasAlertas.push({ mensaje: "Revisión Vencida" });
-          }
-        }
-
-        const estadoVisual = nuevasAlertas.length > 0 ? "mantenimiento" : auto.estado;
-
-        return { ...auto, alertas: nuevasAlertas, 
-            estado: estadoVisual
-         };
-      });
-
-      const filtrados = sedeActiva === 'all' 
-        ? vehiculosProcesados 
+      const filtrados = sedeActiva === 'all'
+        ? vehiculosProcesados
         : vehiculosProcesados.filter(x => String(x.sede_id) === String(sedeActiva));
 
       setVehiculos(filtrados);
@@ -90,7 +81,7 @@ export default function ResumenTab({ sedeActiva }) {
               <div><p className="text-xs text-gray-400 font-bold uppercase tracking-wider">Flota Total</p><p className="text-2xl font-black text-gray-800">{kpis.vehiculosDisponibles}</p></div>
             </div>
           </div>
-          
+
           <div className="flex flex-col items-center">
             <div className="relative w-28 h-28 flex items-center justify-center rounded-full border-[10px] border-orange-500 text-orange-600 text-3xl font-black shadow-inner">
               {kpis.clasesCompletadas}
@@ -107,9 +98,24 @@ export default function ResumenTab({ sedeActiva }) {
           </div>
           <div className="space-y-3 overflow-y-auto max-h-[180px] pr-2">
             {vehiculos.flatMap(v => (v.alertas || []).map((alerta, i) => (
-              <div key={`${v.patente}-${i}`} className="p-3 bg-red-50 border border-red-100 rounded-xl flex justify-between items-center transition-all hover:bg-red-100">
-                <span className="text-xs font-bold text-red-800">{v.patente}</span>
-                <span className="text-[10px] font-medium text-red-600 bg-white px-2 py-1 rounded-full shadow-sm">{alerta.mensaje}</span>
+              <div
+                key={`${v.patente}-${i}`}
+                className={`p-3 rounded-xl flex justify-between items-center transition-all border ${
+                  alerta.tipo === 'critico'
+                    ? 'bg-red-50 border-red-100 hover:bg-red-100'
+                    : 'bg-yellow-50 border-yellow-100 hover:bg-yellow-100'
+                }`}
+              >
+                <span className={`text-xs font-bold ${alerta.tipo === 'critico' ? 'text-red-800' : 'text-yellow-800'}`}>
+                  {v.patente}
+                </span>
+                <span
+                  className={`text-[10px] font-medium px-2 py-1 rounded-full shadow-sm bg-white ${
+                    alerta.tipo === 'critico' ? 'text-red-600' : 'text-yellow-700'
+                  }`}
+                >
+                  {alerta.mensaje}
+                </span>
               </div>
             )))}
             {vehiculos.every(v => !v.alertas || v.alertas.length === 0) && (
@@ -128,13 +134,13 @@ export default function ResumenTab({ sedeActiva }) {
         </h2>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {vehiculos.map((auto) => (
-            <TarjetaVehiculo 
-              key={auto.id} 
-              vehiculo={auto} 
+            <TarjetaVehiculo
+              key={auto.id}
+              vehiculo={auto}
               alFinalizar={() => {
                 setAutoSeleccionado(auto);
                 setModalAbierto(true);
-              }} 
+              }}
             />
           ))}
         </div>
@@ -142,7 +148,7 @@ export default function ResumenTab({ sedeActiva }) {
 
       {/* MODAL DE LIBERACION DE KM */}
       {autoSeleccionado && (
-        <ModalFinalizarSesion 
+        <ModalFinalizarSesion
           abierto={modalAbierto}
           vehiculoId={autoSeleccionado.id}
           patente={autoSeleccionado.patente}

@@ -47,4 +47,13 @@ const emitirEventoReserva = (evento, reserva) => {
   io.emit(evento, reserva);
 };
 
-module.exports = { initSocket, getIO, emitirEventoReserva };
+// Emitir un evento de vehiculo a la room de la sede y al canal global
+const emitirEventoVehiculo = (evento, vehiculo) => {
+  if (!io) return;
+  if (vehiculo.sede_id) {
+    io.to(`sede-${vehiculo.sede_id}`).emit(evento, vehiculo);
+  }
+  io.emit(evento, vehiculo);
+};
+
+module.exports = { initSocket, getIO, emitirEventoReserva, emitirEventoVehiculo };

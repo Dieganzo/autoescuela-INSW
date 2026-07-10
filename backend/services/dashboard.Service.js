@@ -99,7 +99,7 @@ async function getVehiculos(sedeId) {
       'v.estado AS estado', 'v.sede_id AS sede_id', 's.nombre AS sede_nombre',
       'v.kilometraje_actual AS kilometraje_actual', 
       'v.km_ultimo_aceite AS km_ultimo_aceite',
-      'v.km_ultimos_frenos AS km_ultimos_frenos',
+      'v.mantenimiento_automatico AS mantenimiento_automatico',
       'v.fecha_revision_tecnica AS fecha_revision_tecnica'
     ])
     .innerJoin('sedes', 's', 'v.sede_id = s.id');
@@ -109,10 +109,7 @@ async function getVehiculos(sedeId) {
   
   const rows = await qb.getRawMany();
   //Mapeamos los resultados para inyectar las alertas 
-  return rows.map(auto => ({
-    ...auto,
-    alertas: obtenerAlertasVehiculo(auto)
-  }));
+  return Promise.all(rows.map(auto => sincronizarEstadoMantenimiento(auto)));
 }
 
 // Grafico semanal — con dias fantasma
@@ -466,7 +463,6 @@ async function eliminarMeta(id) {
 //motor de reglas para alertas
  const obtenerAlertasVehiculo = (vehiculo) => {
     const UMBRAL_ACEITE = 10000; 
-    const UMBRAL_FRENOS = 20000; 
     const alertas = [];
 
     //alerta de aceite
@@ -474,40 +470,95 @@ async function eliminarMeta(id) {
         alertas.push({ item: "Aceite", nivel: "Critico", mensaje: "Requiere cambio inmediato" });
     }
 
-    //alerta de frenos
-    if (vehiculo.kilometraje_actual - vehiculo.km_ultimos_frenos >= UMBRAL_FRENOS) {
-        alertas.push({ item: "Frenos", nivel: "Advertencia", mensaje: "Revision preventiva necesaria" });
-    }
-
     //alerta Revision tecnica
-    if (vehiculo.fecha_revision_tecnica) {
-        const fechaActual = new Date();
-        const fechaRevision = new Date(vehiculo.fecha_revision_tecnica);
-        const diferenciaDias = (fechaRevision - fechaActual) / (1000 * 60 * 60 * 24);
+  if (vehiculo.fecha_revision_tecnica) {
+    const fechaActual = new Date();
+    const fechaRevision = new Date(vehiculo.fecha_revision_tecnica);
+    const diferenciaDias = (fechaRevision - fechaActual) / (1000 * 60 * 60 * 24);
 
-        if (diferenciaDias <= 30) {
-            alertas.push({ 
-                item: "Revision Tecnica", 
-                nivel: "Urgente", 
-                mensaje: `Vence en ${Math.round(diferenciaDias)} dias` 
-            });
-        }
-    }
+     if (diferenciaDias < 0) {
+        // si el numero es negativo, significa que ya vencio
+        alertas.push({ 
+            item: "Revision Tecnica", 
+            nivel: "Critico", // cambiado a Critico porque ya esta vencida
+            mensaje: `Vencida hace ${Math.abs(Math.round(diferenciaDias))} días` 
+        });
+      } else if (diferenciaDias <= 30) {
+        // Si le quedan 30 días o menos por vencer
+        alertas.push({ 
+            item: "Revision Tecnica", 
+            nivel: "Urgente", 
+            mensaje: `Vence en ${Math.round(diferenciaDias)} dias` 
+         });
+     }
+  }
 
     return alertas;
 };
 
+// calcula alertas y sincroniza estado del vehiculo
+// Sincroniza el estado del vehiculo con las alertas de mantenimiento
+const sincronizarEstadoMantenimiento = async (vehiculo) => {
+  const alertas = [];
+
+  const repoConfig = AppDataSource.getRepository('ConfiguracionFlota');
+  let config = await repoConfig.findOneBy({ id: 1 });
+
+  if (!config) {
+    config = { km_alerta_aceite: 10000, dias_aviso_revision: 30 }; // valores por defecto si no existe la configuración
+  }
+
+  const kmDesdeAceite = vehiculo.kilometraje_actual - vehiculo.km_ultimo_aceite;
+
+  if (kmDesdeAceite >= config.km_alerta_aceite) {
+    alertas.push({ tipo: 'critico', mensaje: 'Cambio de aceite vencido. Requiere mantenimiento urgente.' });
+  } else if (kmDesdeAceite >= (config.km_alerta_aceite - 1000)) { // alerta de advertencia si está a 1000 km del límite
+    alertas.push({ tipo: 'advertencia', mensaje: `Próximo cambio de aceite en ${config.km_alerta_aceite - kmDesdeAceite} km` });
+  }
+
+  if (vehiculo.fecha_revision_tecnica) {
+    const fechaRev = new Date(vehiculo.fecha_revision_tecnica);
+    const hoy = new Date();
+    const diferenciaDias = Math.ceil((fechaRev - hoy) / (1000 * 60 * 60 * 24));
+
+    if (diferenciaDias < 0) {
+      alertas.push({ tipo: 'critico', mensaje: '¡Revisión Técnica Vencida!' });
+    } else if (diferenciaDias <= config.dias_aviso_revision) {
+      alertas.push({ tipo: 'advertencia', mensaje: `Revisión Técnica vence en ${diferenciaDias} días.` });
+    }
+  }
+
+  const tieneCritico = alertas.some(a => a.tipo === 'critico');
+  const repoVehiculo = AppDataSource.getRepository('Vehiculo');
+  const idNum = parseInt(vehiculo.id, 10);
+
+  if (tieneCritico && vehiculo.estado !== 'mantenimiento') {
+    // Si hay alertas criticas y el vehiculo no esta en mantenimiento, lo ponemos en mantenimiento automaticamente.
+    await repoVehiculo.update({ id: idNum }, { estado: 'mantenimiento', mantenimiento_automatico: true });
+    vehiculo.estado = 'mantenimiento';
+    vehiculo.mantenimiento_automatico = true;
+  } else if (!tieneCritico && vehiculo.estado === 'mantenimiento' && vehiculo.mantenimiento_automatico) {
+    // Ya no hay alertas criticas y el mantenimiento fue puesto por el sistema
+    // asi que lo liberamos automaticamente.
+    await repoVehiculo.update({ id: idNum }, { estado: 'disponible', mantenimiento_automatico: false });
+    vehiculo.estado = 'disponible';
+    vehiculo.mantenimiento_automatico = false;
+  }
+
+  return { ...vehiculo, alertas };
+};
+
 const finalizarSesionVehiculo = async (id, kmRecorridos) => { 
     const repo = AppDataSource.getRepository('Vehiculo');
-    // Lógica para actualizar los kilómetros y liberar el vehículo
+    // Logica para actualizar los kilometros y liberar el vehiculo
   try {
     const vehiculoRepository = AppDataSource.getRepository("Vehiculo");
     const vehiculo = await vehiculoRepository.findOneBy({ id: parseInt(id) });
     
     if (vehiculo) {
-      // Sumamos los kilómetros recorridos al total actual
+      // sumamos los kilometros recorridos al total actual
       vehiculo.kilometraje_actual += parseInt(kmRecorridos);
-      // Cambiamos el estado para que otros puedan usarlo
+      // cambiamos el estado para que otros puedan usarlo
       vehiculo.estado = 'disponible';
       
       return await vehiculoRepository.save(vehiculo);
@@ -524,5 +575,6 @@ module.exports = {
   getKPIs, getClasesHoy, getClasesProximas, getVehiculos,
   getGraficoSemana, getUsoFlota, generarReporteAvanzado,
   getAprobadosReprobados, getOcupacionSede, getIngresos, getRendimientoMes,
-  crearMeta, obtenerMetas, actualizarMeta, eliminarMeta,obtenerAlertasVehiculo, finalizarSesionVehiculo,
+  crearMeta, obtenerMetas, actualizarMeta, eliminarMeta,obtenerAlertasVehiculo,
+  sincronizarEstadoMantenimiento, finalizarSesionVehiculo,
 };

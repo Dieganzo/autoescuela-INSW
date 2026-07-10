@@ -5,6 +5,7 @@ import DashboardView from './DashboardView';
 import MetasView from './MetasView';
 import ReservasView from './ReservasView';
 import Proximamente from '../components/Proximamente';
+import FlotaView from './FlotaView';
 
 export default function MainLayout({ user, onLogout }) {
   // Si es estudiante, solo tiene acceso a agenda
@@ -20,6 +21,7 @@ export default function MainLayout({ user, onLogout }) {
   }, []);
 
   const renderVista = () => {
+    console.log("Vista actual:", vistaActual);
     switch (vistaActual) {
       case 'dashboard':
         return <DashboardView sedeActiva={sedeActiva} user={user} />;
@@ -27,6 +29,8 @@ export default function MainLayout({ user, onLogout }) {
         return <MetasView sedeActiva={sedeActiva} user={user} />;
       case 'agenda':
         return <ReservasView user={user} />;
+      case 'flota':
+        return <FlotaView sedeActiva={sedeActiva} user={user} />;  
       default:
         return <Proximamente />;
     }
