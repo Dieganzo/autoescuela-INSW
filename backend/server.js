@@ -17,6 +17,29 @@ const PORT = process.env.PORT || 3000;
 const server = http.createServer(app);
 
 
+const asegurarEsquemaFlota = async () => {
+  await AppDataSource.query(`
+    ALTER TABLE IF EXISTS vehiculos
+    ADD COLUMN IF NOT EXISTS mantenimiento_automatico BOOLEAN DEFAULT FALSE
+  `);
+
+  await AppDataSource.query(`
+    ALTER TABLE IF EXISTS vehiculos
+    ADD COLUMN IF NOT EXISTS km_ultimos_frenos INTEGER DEFAULT 0
+  `);
+
+  await AppDataSource.query(`
+    CREATE TABLE IF NOT EXISTS configuracion_flota (
+      id SERIAL PRIMARY KEY,
+      km_alerta_aceite INTEGER NOT NULL DEFAULT 10000,
+      dias_aviso_revision INTEGER NOT NULL DEFAULT 30,
+      sede_id INTEGER,
+      actualizado_en TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+    )
+  `);
+};
+
+
 initSocket(server);
 
 // Middlewares
@@ -34,6 +57,8 @@ app.get('/', (_req, res) => {
 AppDataSource.initialize()
   .then(async () => {
     console.log('TypeORM conectado a PostgreSQL');
+
+    await asegurarEsquemaFlota();
 
 
     await initMailer();

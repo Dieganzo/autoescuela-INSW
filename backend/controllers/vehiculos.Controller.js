@@ -18,7 +18,8 @@ const crearVehiculo = async (req, res) => {
     const vehiculo = await vehiculoService.crearVehiculoService(req.body, usuarioAuditoria(req), motivoAuditoria(req));
     res.status(201).json({ mensaje: 'Vehiculo creado', vehiculo });
   } catch (error) {
-    res.status(500).json({ error: 'Error al crear vehiculo' });
+    console.error('crearVehiculo error:', error.message);
+    res.status(500).json({ error: error.message || 'Error al crear vehiculo' });
   }
 };
 
@@ -34,7 +35,8 @@ const updateVehiculo = async (req, res) => {
     if (!vehiculo) return res.status(404).json({ error: 'No encontrado' });
     res.json({ mensaje: 'Actualizado', vehiculo });
   } catch (error) {
-    res.status(500).json({ error: 'Error al actualizar vehiculo' });
+    console.error('updateVehiculo error:', error.message);
+    res.status(500).json({ error: error.message || 'Error al actualizar vehiculo' });
   }
 };
 
@@ -50,7 +52,8 @@ const updateEstadoVehiculo = async (req, res) => {
     if (!vehiculo) return res.status(404).json({ error: 'No encontrado' });
     res.json({ mensaje: 'Actualizado', vehiculo });
   } catch (error) {
-    res.status(500).json({ error: 'Error al actualizar' });
+    console.error('updateEstadoVehiculo error:', error.message);
+    res.status(500).json({ error: error.message || 'Error al actualizar' });
   }
 };
 
@@ -75,7 +78,8 @@ const eliminarVehiculo = async (req, res) => {
     if (!vehiculo) return res.status(404).json({ error: 'No encontrado' });
     return res.json({ mensaje: 'Vehiculo eliminado', vehiculo });
   } catch (error) {
-    return res.status(500).json({ error: 'Error al eliminar vehiculo' });
+    console.error('eliminarVehiculo error:', error.message);
+    return res.status(500).json({ error: error.message || 'Error al eliminar vehiculo' });
   }
 };
 
@@ -85,7 +89,8 @@ const getHistorial = async (req, res) => {
     const historial = await vehiculoService.getHistorialService(req.params.id);
     res.json(historial);
   } catch (error) {
-    res.status(500).json({ error: 'Error al obtener historial' });
+    console.error('getHistorial error:', error.message);
+    res.status(500).json({ error: error.message || 'Error al obtener historial' });
   }
 };
 

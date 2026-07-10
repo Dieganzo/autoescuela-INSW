@@ -1,4 +1,4 @@
-const BASE_URL = import.meta.env.VITE_BASE_URL || 'http://localhost:3000';
+const BASE_URL = import.meta.env.VITE_BASE_URL || 'http://localhost:3001';
 
 const API_URL = `${BASE_URL}/api`;
 const API_BASE = `${BASE_URL}/api/dashboard`;
