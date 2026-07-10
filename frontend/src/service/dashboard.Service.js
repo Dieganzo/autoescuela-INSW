@@ -1,5 +1,7 @@
-const API_URL = import.meta.env.VITE_BASE_URL;
-const API_BASE = import.meta.env.VITE_BASE_URL ? `${import.meta.env.VITE_BASE_URL}/api/dashboard` : '/api/dashboard';
+const BASE_URL = import.meta.env.VITE_BASE_URL || 'http://localhost:3000';
+
+const API_URL = `${BASE_URL}/api`;
+const API_BASE = `${BASE_URL}/api/dashboard`;
 
 function buildSedeParam(sedeId) {
   // Backend expects no sedeId param (or null) for "all sedes"
@@ -246,6 +248,7 @@ export const dashboardService = {
   },
 };
 
+// Función para obtener el inventario de la flota, con opción de filtrar por sede
 export const obtenerInventarioFlota = async (sedeId = null) => {
     try {
         const parametroSede = sedeId ? `?sedeId=${sedeId}` : '';
@@ -257,4 +260,47 @@ export const obtenerInventarioFlota = async (sedeId = null) => {
         return [];
     }
 };
+
+// 1. crear un nuevo vehiculo
+export async function crearVehiculo(vehiculoData) {
+  const response = await fetch(`${API_URL}/vehiculos`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      // si usas tokens de autenticacion, agrégalos aqui
+    },
+    body: JSON.stringify(vehiculoData)
+  });
+  if (!response.ok) throw new Error('Error al crear el vehículo');
+  return response.json();
+}
+
+// 2. Editar un vehiculo existente
+export async function actualizarVehiculo(id, vehiculoData) {
+  const response = await fetch(`${API_URL}/vehiculos/${id}`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(vehiculoData)
+  });
+  if (!response.ok) throw new Error('Error al actualizar el vehículo');
+  return response.json();
+}
+
+// 3. Eliminar un vehiculo
+export async function eliminarVehiculo(id, motivo = null) {
+  const response = await fetch(`${API_URL}/vehiculos/${id}`, {
+    method: 'DELETE',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ motivo }),
+  });
+  if (!response.ok) throw new Error('Error al eliminar el vehículo');
+  return response.json();
+}
+
+// 4. Obtener el historial
+export async function obtenerHistorialVehiculo(id) {
+  const response = await fetch(`${API_URL}/vehiculos/${id}/historial`);
+  if (!response.ok) throw new Error('Error al obtener el historial');
+  return response.json();
+}
 
