@@ -10,10 +10,10 @@ const Vehiculo = new EntitySchema({
     estado: { type: 'varchar', length: 50, default: 'disponible', nullable: true },
     kilometraje_actual: { type: 'int', default: 0, nullable: true },
     km_ultimo_aceite: { type: 'int', default: 0, nullable: true },
-    km_ultimos_frenos: { type: 'int', default: 0, nullable: true },
     km_proximo_mantenimiento: { type: 'int', default: 0, nullable: true },
     fecha_revision_tecnica: { type: 'date', nullable: true },
     sede_id: { type: 'int', nullable: true },
+    mantenimiento_automatico: { type: 'boolean', default: false, nullable: true },
   },
   relations: {
     sede: {

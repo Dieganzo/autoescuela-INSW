@@ -1,6 +1,6 @@
 const cron = require('node-cron');
 const { AppDataSource } = require('../db/data-source');
-const { emitirEventoReserva } = require('../services/socket');
+const { emitirEventoReserva, emitirEventoVehiculo } = require('../services/socket');
 const { enviarRecordatorio } = require('../services/notificaciones.Service');
 
 // Iniciar tareas programadas (cron jobs) del sistema de reservas
@@ -44,7 +44,18 @@ const iniciarScheduler = () => {
       const afectadas = resultado.raw || [];
       if (afectadas.length > 0) {
         console.log(`${afectadas.length} reserva(s) activada(s) -> en_progreso`);
-        afectadas.forEach((r) => emitirEventoReserva('reserva:actualizada', r));
+        
+        //actualizamos el auto a 'en_sesion'
+        const repoVehiculo = AppDataSource.getRepository('Vehiculo');
+        
+        for (const r of afectadas) {
+          emitirEventoReserva('reserva:actualizada', r);
+          
+          if (r.vehiculo_id) {
+            await repoVehiculo.update(r.vehiculo_id, { estado: 'en_sesion' });
+            emitirEventoVehiculo('vehiculo:actualizado', { id: r.vehiculo_id, estado: 'en_sesion' });
+          }
+        }
       }
     } catch (err) {
       console.error('Error en job activar en curso:', err.message);
@@ -66,7 +77,18 @@ const iniciarScheduler = () => {
       const afectadas = resultado.raw || [];
       if (afectadas.length > 0) {
         console.log(`${afectadas.length} reserva(s) finalizada(s) -> completada`);
-        afectadas.forEach((r) => emitirEventoReserva('reserva:actualizada', r));
+        
+        // Liberamos el auto devolviendolo a 'disponible'
+        const repoVehiculo = AppDataSource.getRepository('Vehiculo');
+
+        for (const r of afectadas) {
+          emitirEventoReserva('reserva:actualizada', r);
+          
+          if (r.vehiculo_id) {
+            await repoVehiculo.update(r.vehiculo_id, { estado: 'disponible' });
+            emitirEventoVehiculo('vehiculo:actualizado', { id: r.vehiculo_id, estado: 'disponible' });
+          }
+        }
       }
     } catch (err) {
       console.error('Error en job finalizar completadas:', err.message);
